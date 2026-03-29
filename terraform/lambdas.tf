@@ -114,47 +114,23 @@ resource "aws_lambda_function" "file_selector" {
   depends_on = [null_resource.build_layer]
 }
 
-resource "aws_iam_role" "scheduler_exec" {
-  name = "nsw-property-scheduler-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Principal = { Service = "scheduler.amazonaws.com" }
-      Action    = "sts:AssumeRole"
-    }]
-  })
+# monday 10am sydney time = midnight UTC
+resource "aws_cloudwatch_event_rule" "file_selector_weekly" {
+  name                = "nsw-property-file-selector-weekly"
+  schedule_expression = "cron(0 0 ? * MON *)"
 }
 
-resource "aws_iam_role_policy" "scheduler_invoke" {
-  name = "InvokeLambda"
-  role = aws_iam_role.scheduler_exec.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "lambda:InvokeFunction"
-      Resource = aws_lambda_function.file_selector.arn
-    }]
-  })
+resource "aws_cloudwatch_event_target" "file_selector" {
+  rule = aws_cloudwatch_event_rule.file_selector_weekly.name
+  arn  = aws_lambda_function.file_selector.arn
 }
 
-resource "aws_scheduler_schedule" "file_selector_weekly" {
-  name = "nsw-property-file-selector-weekly"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  schedule_expression          = "cron(0 10 ? * MON *)"
-  schedule_expression_timezone = "Australia/Sydney"
-
-  target {
-    arn      = aws_lambda_function.file_selector.arn
-    role_arn = aws_iam_role.scheduler_exec.arn
-  }
+resource "aws_lambda_permission" "allow_eventbridge" {
+  statement_id  = "AllowEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.file_selector.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.file_selector_weekly.arn
 }
 
 resource "aws_lambda_function" "file_downloader" {
@@ -210,7 +186,7 @@ resource "aws_lambda_function" "db_ingestor" {
   runtime                        = "python3.12"
   timeout                        = 200
   memory_size                    = 500
-  reserved_concurrent_executions = 30
+  reserved_concurrent_executions = 10
   filename                       = data.archive_file.db_ingestor.output_path
   source_code_hash               = data.archive_file.db_ingestor.output_base64sha256
   layers                         = [aws_lambda_layer_version.dependencies.arn]
@@ -220,4 +196,10 @@ resource "aws_lambda_function" "db_ingestor" {
   }
 
   depends_on = [null_resource.build_layer]
+}
+
+# for inital load only uncomment this seciton when all files are ready to load in SQS
+resource "aws_lambda_event_source_mapping" "db_ingestor_sqs" {
+  event_source_arn = aws_sqs_queue.ingestion_queue.arn
+  function_name    = aws_lambda_function.db_ingestor.arn
 }
