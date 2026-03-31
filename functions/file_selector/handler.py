@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 lambda_client = boto3.client("lambda")
 s3_client = boto3.client("s3")
 
-# Pulled from env vars set in template.yaml
+# pulled from env vars set in Terraform
 WORKER_FUNCTION = os.environ["FILE_DOWNLOADER_FUNCTION_NAME"]
 S3_BUCKET = os.environ["S3_BUCKET_NAME"]
 

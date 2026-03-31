@@ -42,7 +42,7 @@ def lambda_handler(event, context):
 
         filelist = get_all_files(zip_data, zip_key)
 
-        # FILTER: Keep only .dat files
+        # only keep .dat files, ignore everything else
         dat_files = [f for f in filelist if f.lower().endswith(".dat")]
 
         for file_path in dat_files:

@@ -1,5 +1,3 @@
-# large file 
-
 import json
 import boto3
 import io 
@@ -31,7 +29,7 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        print(f"✗ Connection failed: {str(e)}")
+        print(f"Connection failed: {str(e)}")
         print(f"  Host: {DB_HOST}")
         print(f"  Port: {DB_PORT}")
         print(f"  User: {DB_USER}")
@@ -76,7 +74,7 @@ def lambda_handler(event, context):
                 print(f"Unexpected error: {str(e)}")
                 raise
     finally:
-        #  CLOSE CONNECTION HERE - Always executes, even if error occurs
+        # close the connection — runs even if something above threw an error
         connection.close()
     return {'statusCode': 200}
 
