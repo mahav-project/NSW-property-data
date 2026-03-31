@@ -1,8 +1,3 @@
-# NSW Property Data Pipeline
-
-An automated serverless ETL pipeline that ingests historical and weekly NSW property sales data from the NSW Valuer General into a PostgreSQL database on AWS RDS.
-
----
 
 ## Overview
 
