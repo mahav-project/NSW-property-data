@@ -13,7 +13,7 @@ This project downloads, processes, and stores all NSW property sales records dat
 | **RDS (PostgreSQL 16)** | Stores all property sales records |
 | **S3** | Stores downloaded ZIP files and extracted `.dat` files |
 | **SQS** | Decouples ZIP scanning from database ingestion |
-| **EventBrige** | Weekly cron trigger (Monday 10am AEDT) |
+| **EventBridge** | Weekly cron trigger (Monday 10am AEDT) |
 | **CloudWatch Dashboard** | Monitors Lambda errors and invocations |
 | **Terraform** | Infrastructure as Code for all AWS resources |
 
