@@ -10,11 +10,11 @@ This project downloads, processes, and stores all NSW property sales records dat
 | Service | Purpose |
 |---|---|
 | **AWS Lambda (Python 3.12)** | 4 serverless functions driving the entire pipeline |
-| **AWS RDS (PostgreSQL 16)** | Stores all property sales records |
-| **AWS S3** | Stores downloaded ZIP files and extracted `.dat` files |
-| **AWS SQS** | Decouples ZIP scanning from database ingestion |
-| **AWS EventBrige** | Weekly cron trigger (Monday 10am AEDT) |
-| **AWS CloudWatch Dashboard** | Monitors Lambda errors and invocations |
+| **RDS (PostgreSQL 16)** | Stores all property sales records |
+| **S3** | Stores downloaded ZIP files and extracted `.dat` files |
+| **SQS** | Decouples ZIP scanning from database ingestion |
+| **EventBrige** | Weekly cron trigger (Monday 10am AEDT) |
+| **CloudWatch Dashboard** | Monitors Lambda errors and invocations |
 | **Terraform** | Infrastructure as Code for all AWS resources |
 
 ---
