@@ -13,7 +13,7 @@ This project downloads, processes, and stores all NSW property sales records dat
 | **AWS RDS (PostgreSQL 16)** | Stores all property sales records |
 | **AWS S3** | Stores downloaded ZIP files and extracted `.dat` files |
 | **AWS SQS** | Decouples ZIP scanning from database ingestion |
-| **AWS CloudWatch Events** | Weekly cron trigger (Monday 10am AEDT) |
+| **AWS EventBrige** | Weekly cron trigger (Monday 10am AEDT) |
 | **AWS CloudWatch Dashboard** | Monitors Lambda errors and invocations |
 | **Terraform** | Infrastructure as Code for all AWS resources |
 
@@ -24,7 +24,7 @@ This project downloads, processes, and stores all NSW property sales records dat
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                  CloudWatch Event Rule                           │
-│              cron(0 0 ? * MON *)  — Monday 10am AEDT            │
+│         
 └─────────────────────────┬────────────────────────────────────────┘
                           │
                           ▼
@@ -42,7 +42,7 @@ This project downloads, processes, and stores all NSW property sales records dat
               │  NSW Valuer General   │
               │  → Stores in S3       │
               └───────────┬───────────┘
-                          │  Async Lambda Invoke
+                          │  Async Lambda Invoke (×N files)
                           ▼
               ┌───────────────────────┐
               │      zip_scanner      │
@@ -269,38 +269,3 @@ Key resources created:
 ## Future Plans — Property Dashboard
 
 The next phase of this project is to build an interactive **property data dashboard** hosted on an **AWS EC2 instance**, built entirely in Python.
-
-### Planned Stack
-
-| Component | Technology |
-|---|---|
-| **Dashboard framework** | Plotly Dash or Streamlit |
-| **Database connection** | psycopg2 / SQLAlchemy → RDS PostgreSQL |
-| **Hosting** | AWS EC2 (Python web server) |
-| **Reverse proxy** | Nginx |
-| **Process manager** | systemd or PM2 |
-
-### Planned Features
-
-- **Interactive map** — choropleth or scatter map of property sales across NSW suburbs
-- **Price trends** — historical median sale price by suburb, property type, or zone
-- **Sales volume charts** — weekly/monthly/yearly transaction counts
-- **Filter controls** — filter by suburb, postcode, date range, property type, sale price
-- **Top suburbs** — ranked list by median price, volume, or price growth
-- **Raw data table** — searchable, sortable view of individual transactions
-- **Download** — export filtered results to CSV
-
-### Architecture (Planned)
-
-```
-User Browser
-     │
-     ▼
-EC2 Instance (Python Dash App)
-     │
-     ▼
-AWS RDS PostgreSQL
-(vw_nsw_property_sales)
-```
-
-The EC2 instance will query the existing RDS database directly, so no additional data infrastructure is needed — the pipeline already keeps the data fresh every Monday.
