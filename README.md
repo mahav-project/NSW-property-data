@@ -3,6 +3,8 @@
 
 This project downloads, processes, and stores all NSW property sales records dating back to 1990. Data is sourced from the NSW Valuer General website, extracted from nested ZIP archives, parsed from `.dat` files, and loaded into a structured PostgreSQL database. The pipeline runs automatically every Monday and keeps the database up to date with the latest weekly release.
 
+Dashboard [WIP] : https://nsw-property-data-mahavir.streamlit.app/
+
 ---
 
 ## Cloud Technology
