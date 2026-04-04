@@ -196,6 +196,11 @@ select
 	nature_of_property,
 	primary_purpose,
 	strata_lot_number,
+	-- Unit if it has a unit number or strata lot, otherwise House
+	case
+		when unit_number is not null or strata_lot_number is not null then 'Unit'
+		else 'House'
+	end as property_type,
 	-- Sale details
 	sale_code,
 	percent_interest_of_sale,
