@@ -179,7 +179,12 @@ select
 		when sc >= 24 then to_date(contract_date_raw, 'YYYYMMDD')
 		else to_date(contract_date_raw, 'DD/MM/YYYY')
 	end as contract_date,
+	extract(year from case
+		when sc >= 24 then to_date(contract_date_raw, 'YYYYMMDD')
+		else to_date(contract_date_raw, 'DD/MM/YYYY')
+	end)::int as contract_year,
 	to_date(settlement_date_raw, 'YYYYMMDD') as settlement_date,
+	extract(year from to_date(settlement_date_raw, 'YYYYMMDD'))::int as settlement_year,
 	-- Financials & land
 	purchase_price,
 	land_description,
@@ -197,3 +202,6 @@ select
 	dealing_number
 from
 	mapped;
+CREATE MATERIALIZED VIEW mv_nsw_property_sales AS
+SELECT *
+FROM vw_nsw_property_sales;
