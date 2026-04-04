@@ -77,7 +77,7 @@ def get_suburb_stats(years, postcodes, property_types):
               AND property_type = ANY(%s)
             GROUP BY suburb
             ORDER BY COUNT(*) DESC
-            LIMIT 20
+            LIMIT 10
         )
         SELECT m.suburb, m.property_type, COUNT(*) AS sales_count,
                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY m.purchase_price) AS median_price
@@ -92,6 +92,35 @@ def get_suburb_stats(years, postcodes, property_types):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(query, (postcodes, years, property_types, postcodes, years, property_types))
+
+    columns = [col.name for col in cursor.description]
+    rows = cursor.fetchall()
+
+    return columns, rows
+
+
+@st.cache_data(ttl=600)
+def get_price_trends(years, postcodes, property_types):
+    """
+    Returns median price by contract year and property type.
+    """
+    query = """
+        SELECT
+            DATE_TRUNC('quarter', contract_date)                         AS contract_quarter,
+            property_type,
+            COUNT(*)                                                     AS sales_count,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY purchase_price) AS median_price
+        FROM mv_nsw_property_sales
+        WHERE post_code     = ANY(%s)
+          AND contract_year = ANY(%s)
+          AND property_type = ANY(%s)
+        GROUP BY contract_quarter, property_type
+        ORDER BY contract_quarter
+    """
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(query, (postcodes, years, property_types))
 
     columns = [col.name for col in cursor.description]
     rows = cursor.fetchall()

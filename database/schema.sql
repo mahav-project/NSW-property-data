@@ -206,7 +206,15 @@ select
 	percent_interest_of_sale,
 	dealing_number
 from
-	mapped;
+	mapped
+	where
+	    case
+        when sc >= 24 then to_date(contract_date_raw, 'YYYYMMDD')
+        else to_date(contract_date_raw, 'DD/MM/YYYY')
+    end <= CURRENT_DATE;
+
+
+
 CREATE MATERIALIZED VIEW mv_nsw_property_sales AS
 SELECT *
 FROM vw_nsw_property_sales;
