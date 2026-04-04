@@ -9,3 +9,8 @@ terraform/.build/
 __pycache__/
 *.pyc
 .env
+
+# Streamlit secrets
+streamlit/.streamlit/secrets.toml
+
+testscripts
