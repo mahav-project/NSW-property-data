@@ -74,10 +74,12 @@ try:
         fig = px.bar(
             suburb_data,
             x="sales_count", y="suburb", orientation="h",
-            labels={"sales_count": "Sales", "suburb": "Suburb"},
+            color="property_type",
+            barmode="stack",
+            labels={"sales_count": "Sales", "suburb": "Suburb", "property_type": "Type"},
             text="sales_count"
         )
-        fig.update_traces(textposition="outside")
+        fig.update_traces(textposition="inside")
         fig.update_layout(yaxis={"categoryorder": "total ascending"}, height=500)
         st.plotly_chart(fig, use_container_width=True)
 

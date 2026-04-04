@@ -67,21 +67,31 @@ def get_suburb_stats(years, postcodes, property_types):
     """
     Returns sales count and median price grouped by suburb.
     """
+    # First find the top 20 suburbs by total sales, then get the House/Unit breakdown for those suburbs
     query = """
-        SELECT suburb, COUNT(*) AS sales_count,
-               PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY purchase_price) AS median_price
-        FROM mv_nsw_property_sales
-        WHERE post_code = ANY(%s)
-          AND contract_year = ANY(%s)
-          AND property_type = ANY(%s)
-        GROUP BY suburb
-        ORDER BY sales_count DESC
-        LIMIT 20
+        WITH top_suburbs AS (
+            SELECT suburb
+            FROM mv_nsw_property_sales
+            WHERE post_code = ANY(%s)
+              AND contract_year = ANY(%s)
+              AND property_type = ANY(%s)
+            GROUP BY suburb
+            ORDER BY COUNT(*) DESC
+            LIMIT 20
+        )
+        SELECT m.suburb, m.property_type, COUNT(*) AS sales_count,
+               PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY m.purchase_price) AS median_price
+        FROM mv_nsw_property_sales m
+        JOIN top_suburbs t ON m.suburb = t.suburb
+        WHERE m.post_code = ANY(%s)
+          AND m.contract_year = ANY(%s)
+          AND m.property_type = ANY(%s)
+        GROUP BY m.suburb, m.property_type
     """
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(query, (postcodes, years, property_types))
+    cursor.execute(query, (postcodes, years, property_types, postcodes, years, property_types))
 
     columns = [col.name for col in cursor.description]
     rows = cursor.fetchall()
