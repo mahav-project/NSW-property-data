@@ -10,7 +10,7 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ## Architecture
 
-![NSW Property ETL Flowchart](images/NSW Property Sale Data-2026-04-05-022556.png)
+![NSW Property ETL Flowchart](images/NSW%20Property%20Sale%20Data-2026-04-05-022556.png)
 ---
 
 ## AWS Components
