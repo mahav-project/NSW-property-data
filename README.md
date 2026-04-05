@@ -1,6 +1,6 @@
 ## NSW Property Sales
 
-An end-to-end data pipeline that ingests every NSW property sale recorded since 1990 — over **150,000 files processed**, **35+ years** of transactions, updated automatically every Monday.
+An end-to-end data pipeline that ingests every NSW property sale recorded since 1990 — over **150,000+ files processed**, **35+ years** of transactions, updated automatically every Monday.
 
 **Dashboard → [nsw-property-data.streamlit.app](https://nsw-property-data.streamlit.app/)**
 
