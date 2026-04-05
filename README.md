@@ -15,8 +15,8 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 | **S3** | Stores raw ZIPs |
 | **SQS** | Decouples zip_scanner from db_ingestor; one message per .dat file |
 | **SQS DLQ** | Catches failed ingestor messages after 1 retry, retained 14 days |
-| **RDS PostgreSQL 16** | t3.micro, private subnet — stores all sales data |
-| **Lambda Layer** | Shared Python dependencies (psycopg2) across all functions |
+| **RDS PostgreSQL 16** | t3.micro  — stores all sales data |
+| **Lambda Layer** | Shared Python dependencies across all functions |
 | **CloudWatch** | Dashboard + Lambda execution metrics |
 | **Terraform** | All infrastructure defined as code, single `terraform apply` deploy |
 
