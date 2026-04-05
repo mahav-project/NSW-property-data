@@ -34,16 +34,9 @@ Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, r
 - **batch inserts of 1,000 rows** — amortises RDS round-trip cost without hitting transaction size limits
 - **pre-aggregated MVs** — dashboard queries hit small pre-rolled tables instead of scanning millions of raw rows on every page load
 
----
-
 ## Database
 
 Raw `.dat` records land in `nsw_property_sales_raw` unchanged. A normalised view on top handles the two historical file formats (field layouts changed after 2001), constructs full addresses, and derives property type from unit and strata fields. A materialized snapshot sits above that for query performance, with three further pre-aggregated views refreshed every Monday after ingestion completes.
-
----
-
-
----
 
 ## Repo Structure
 
@@ -53,8 +46,6 @@ Raw `.dat` records land in `nsw_property_sales_raw` unchanged. A normalised view
 ├── streamlit/          dashboard app
 └── terraform/          all AWS infrastructure as code
 ```
-
----
 
 ## Deploy
 
