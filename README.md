@@ -17,103 +17,103 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
                            ▼
                ┌───────────────────────┐
                │     file_selector     │
-               │  Builds download list │
-               │  (yearly 1990–now     │
-               │   + latest weekly)    │
+               │  Lambda — builds the  │
+               │  download list:       │
+               │  yearly 1990–present  │
+               │  + current week       │
                └───────────┬───────────┘
                            │  Async invoke × N files
                            ▼
                ┌───────────────────────┐
                │    file_downloader    │
-               │  Downloads ZIPs from  │
-               │  NSW Valuer General   │
+               │  Lambda — downloads   │
+               │  each ZIP directly    │
+               │  from NSW Valuer Gen  │
                └───────────┬───────────┘
-                           │  Saves to S3 → async invoke
+                           │  Saves raw ZIP to S3
+                           │  → async invoke
                            ▼
                ┌───────────────────────┐
                │      zip_scanner      │
-               │  Recursively unpacks  │
-               │  nested ZIPs, finds   │
-               │  all .dat files       │
+               │  Lambda — recursively │
+               │  unpacks nested ZIPs, │
+               │  locates all .dat     │
+               │  files inside         │
                └───────────┬───────────┘
                            │  1 SQS message per .dat file
                            ▼
                ┌───────────────────────┐
                │      db_ingestor      │
-               │  Parses .dat lines    │
-               │  Batch inserts 1,000  │
-               │  records per txn      │
-               └───────────┬───────────┘
-                           │  On failure (after 1 retry)
-                    ┌──────┴──────┐
-                    ▼             ▼
-              RDS PostgreSQL    Dead Letter
-              (PostgreSQL 16)   Queue (14d)
-                    │
-                    ▼
-    ┌─────────────────────────────────────┐
-    │         Database Layers             │
-    │                                     │
-    │  nsw_property_sales_raw             │  ← raw .dat records
-    │      ↓                              │
-    │  vw_nsw_property_sales              │  ← normalised view
-    │      ↓                              │
-    │  mv_nsw_property_sales              │  ← materialized snapshot
-    │      ↓                              │
-    │  mv_stats_agg                       │  ┐
-    │  mv_quarterly_agg                   │  ├─ pre-aggregated for dashboard
-    │  mv_suburb_agg                      │  ┘
-    └─────────────────────────────────────┘
-                    │
-                    ▼
-    ┌─────────────────────────────────────┐
-    │   Streamlit Dashboard               │
-    │   nsw-property-data.streamlit.app   │
-    │   Parallel queries · 10min cache    │
-    └─────────────────────────────────────┘
+               │  Lambda — parses each │
+               │  .dat, batch-inserts  │
+               │  1,000 rows per txn   │
+               │  into RDS             │
+               └──────────┬────────────┘
+                          │               On failure (after 1 retry)
+                   ┌──────┴────────────────────────┐
+                   ▼                               ▼
+           RDS PostgreSQL 16                Dead Letter Queue
+           (t3.micro, private subnet)       (retained 14 days)
+                   │
+                   ▼
+   ┌─────────────────────────────────────┐
+   │           Database Layers           │
+   │                                     │
+   │  nsw_property_sales_raw             │  ← raw .dat records, inserted as-is
+   │      ↓                              │
+   │  vw_nsw_property_sales              │  ← normalised: parses semicolons,
+   │                                     │    handles pre/post-2001 formats,
+   │                                     │    derives property_type, full address
+   │      ↓                              │
+   │  mv_nsw_property_sales              │  ← materialized snapshot for performance
+   │      ↓                              │
+   │  mv_stats_agg                       │  ┐
+   │  mv_quarterly_agg                   │  ├─ pre-aggregated, refreshed weekly
+   │  mv_suburb_agg                      │  ┘
+   └─────────────────────────────────────┘
+                   │
+                   ▼
+   ┌─────────────────────────────────────┐
+   │        Streamlit Dashboard          │
+   │   Pre-agg queries · parallel        │
+   │   execution · 10min cache           │
+   └─────────────────────────────────────┘
 ```
 
 ---
 
-## Stack
+## AWS Components
 
-| Layer | Tech |
+| Service | Role |
 |---|---|
-| Pipeline | AWS Lambda (Python 3.12) × 4 functions |
-| Storage | S3 (raw ZIPs + .dat files) |
-| Queue | SQS + DLQ |
-| Database | RDS PostgreSQL 16 (t3.micro) |
-| Dashboard | Streamlit Cloud + Plotly |
-| IaC | Terraform |
-| Scheduler | EventBridge cron |
+| **EventBridge** | Cron trigger — fires every Monday 10am AEDT |
+| **Lambda × 4** | file_selector → file_downloader → zip_scanner → db_ingestor |
+| **S3** | Stores raw ZIPs and extracted .dat files |
+| **SQS** | Decouples zip_scanner from db_ingestor; one message per .dat file |
+| **SQS DLQ** | Catches failed ingestor messages after 1 retry, retained 14 days |
+| **RDS PostgreSQL 16** | t3.micro, private subnet — stores all sales data |
+| **Lambda Layer** | Shared Python dependencies (psycopg2) across all functions |
+| **CloudWatch** | Dashboard + Lambda execution metrics |
+| **Terraform** | All infrastructure defined as code, single `terraform apply` deploy |
+
+### Why this shape?
+
+- **fan-out via async Lambda invokes** — file_selector triggers one file_downloader per file in parallel, so 150K+ files don't queue up sequentially
+- **SQS between scanner and ingestor** — absorbs bursts, provides natural retry/DLQ boundary, and lets Lambda scale concurrency independently per stage
+- **batch inserts of 1,000 rows** — amortises RDS round-trip cost without hitting transaction size limits
+- **pre-aggregated MVs** — dashboard queries hit small pre-rolled tables instead of scanning millions of raw rows on every page load
 
 ---
 
 ## Database
 
-Raw `.dat` records land in `nsw_property_sales_raw` as-is. The normalised view `vw_nsw_property_sales` parses the semicolon-delimited lines, handles two historical formats (pre/post 2001 field layouts), constructs full addresses, and derives `property_type` (House vs Unit) from unit and strata fields.
-
-Three pre-aggregated materialized views sit on top and power the dashboard queries:
-
-| View | Grain | Used for |
-|---|---|---|
-| `mv_stats_agg` | year + postcode + type | KPI cards |
-| `mv_quarterly_agg` | quarter + year + postcode + type | Volume + price trend charts |
-| `mv_suburb_agg` | suburb + year + postcode + type | Top 10 suburbs chart |
-
-Each stores `sales_count`, `price_sum`, and `median_price` so re-aggregation across any filter combination stays accurate. All four MVs are refreshed in sequence every Monday after ingestion completes.
+Raw `.dat` records land in `nsw_property_sales_raw` unchanged. A normalised view on top handles the two historical file formats (field layouts changed after 2001), constructs full addresses, and derives property type from unit and strata fields. A materialized snapshot sits above that for query performance, with three further pre-aggregated views refreshed every Monday after ingestion completes.
 
 ---
 
 ## Dashboard
 
-Filters by year, postcode, and property type. Three queries run in parallel via `ThreadPoolExecutor` and results are cached for 10 minutes.
-
-- **KPIs** — total sales, average price, median price
-- **Sale Volume by Quarter** — stacked bar (House vs Unit)
-- **Median Price by Quarter** — dual-line trend
-- **Top 10 Suburbs** — horizontal stacked bar
-- **Recent 50 Sales** — transaction table with address, price, area, and dates
+Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, results cached for 10 minutes, backed entirely by pre-aggregated materialized views so page loads stay fast regardless of filter combination.
 
 ---
 
@@ -121,8 +121,8 @@ Filters by year, postcode, and property type. Three queries run in parallel via 
 
 ```
 ├── functions/          4 Lambda handlers + shared requirements
-├── database/           schema, materialized views, indexes, refresh scripts
-├── streamlit/          dashboard.py, queries.py, db.py
+├── database/           schema, views, indexes, refresh scripts
+├── streamlit/          dashboard app
 └── terraform/          all AWS infrastructure as code
 ```
 
