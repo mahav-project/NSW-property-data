@@ -6,8 +6,6 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 **Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)**
 
----
-
 ## AWS Components
 
 | Service | Role |
