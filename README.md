@@ -54,7 +54,7 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
                    ┌──────┴────────────────────────┐
                    ▼                               ▼
            RDS PostgreSQL 16                Dead Letter Queue
-           (t3.micro, private subnet)       (retained 14 days)
+           (t3.micro)                       (retained 14 days)
                    │
                    ▼
    ┌─────────────────────────────────────┐
