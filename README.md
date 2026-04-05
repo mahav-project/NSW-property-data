@@ -8,9 +8,6 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ---
 
-## Architecture
-
-![NSW Property ETL Flowchart](images/NSW%20Property%20Sale%20Data-2026-04-05-022556.png)
 ---
 
 ## AWS Components
@@ -26,6 +23,10 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 | **Lambda Layer** | Shared Python dependencies (psycopg2) across all functions |
 | **CloudWatch** | Dashboard + Lambda execution metrics |
 | **Terraform** | All infrastructure defined as code, single `terraform apply` deploy |
+
+## Architecture
+
+![NSW Property ETL Flowchart](images/NSW%20Property%20Sale%20Data-2026-04-05-022556.png)
 
 ### Why this shape?
 
