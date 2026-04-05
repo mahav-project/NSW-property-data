@@ -75,8 +75,7 @@ try:
             columns, rows = f_trends
             trend_data = [dict(zip(columns, row)) for row in rows]
             for row in trend_data:
-                dt = row["contract_quarter"]
-                row["contract_quarter"] = f"Q{(dt.month - 1) // 3 + 1} {dt.year}"
+                row["contract_quarter"] = f"Q{row['contract_quarter']} {row['contract_year']}"
 
             col_vol, col_price = st.columns(2)
 

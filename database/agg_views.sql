@@ -17,15 +17,15 @@ GROUP BY contract_year, post_code, property_type;
 
 CREATE MATERIALIZED VIEW mv_quarterly_agg AS
 SELECT
-    DATE_TRUNC('quarter', contract_date) AS contract_quarter,
     contract_year,
+    EXTRACT(QUARTER FROM contract_date)::int AS contract_quarter,
     post_code,
     property_type,
     COUNT(*)             AS sales_count,
     SUM(purchase_price)  AS price_sum,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY purchase_price) AS median_price
 FROM mv_nsw_property_sales
-GROUP BY DATE_TRUNC('quarter', contract_date), contract_year, post_code, property_type;
+GROUP BY contract_year, EXTRACT(QUARTER FROM contract_date)::int, post_code, property_type;
 
 
 CREATE MATERIALIZED VIEW mv_suburb_agg AS

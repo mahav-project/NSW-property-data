@@ -107,16 +107,17 @@ def get_price_trends(years, postcodes, property_types):
     """
     query = """
         SELECT
+            contract_year,
             contract_quarter,
             property_type,
-            SUM(sales_count)                                                    AS sales_count,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY median_price)           AS median_price
+            SUM(sales_count)                                          AS sales_count,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY median_price) AS median_price
         FROM mv_quarterly_agg
         WHERE post_code     = ANY(%s)
           AND contract_year = ANY(%s)
           AND property_type = ANY(%s)
-        GROUP BY contract_quarter, property_type
-        ORDER BY contract_quarter
+        GROUP BY contract_year, contract_quarter, property_type
+        ORDER BY contract_year, contract_quarter
     """
 
     conn = get_connection()
