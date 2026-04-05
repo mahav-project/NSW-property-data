@@ -16,7 +16,7 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 |---|---|
 | **EventBridge** | Cron trigger — fires every Monday 10am AEDT |
 | **Lambda × 4** | file_selector → file_downloader → zip_scanner → db_ingestor |
-| **S3** | Stores raw ZIPs and extracted .dat files |
+| **S3** | Stores raw ZIPs |
 | **SQS** | Decouples zip_scanner from db_ingestor; one message per .dat file |
 | **SQS DLQ** | Catches failed ingestor messages after 1 retry, retained 14 days |
 | **RDS PostgreSQL 16** | t3.micro, private subnet — stores all sales data |
