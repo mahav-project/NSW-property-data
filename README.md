@@ -10,13 +10,6 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ## Architecture
 
-Likely caused by a few things Mermaid's parser can choke on:
-
-- **`**bold**` inside node labels** — not standard Mermaid syntax, can break parsing
-- **Emojis** — hit or miss depending on the renderer
-- **`·` middle dot** — can cause issues
-
-Here's a clean, safe version without those:
 
 ```mermaid
 flowchart TD
