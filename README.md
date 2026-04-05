@@ -8,8 +8,6 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ---
 
----
-
 ## AWS Components
 
 | Service | Role |
@@ -23,6 +21,9 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 | **Lambda Layer** | Shared Python dependencies (psycopg2) across all functions |
 | **CloudWatch** | Dashboard + Lambda execution metrics |
 | **Terraform** | All infrastructure defined as code, single `terraform apply` deploy |
+
+## Dashboard
+Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, results cached for 10 minutes, backed entirely by pre-aggregated materialized views so page loads stay fast regardless of filter combination.
 
 ## Architecture
 
@@ -43,9 +44,6 @@ Raw `.dat` records land in `nsw_property_sales_raw` unchanged. A normalised view
 
 ---
 
-## Dashboard
-
-Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, results cached for 10 minutes, backed entirely by pre-aggregated materialized views so page loads stay fast regardless of filter combination.
 
 ---
 
