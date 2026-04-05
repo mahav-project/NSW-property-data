@@ -10,26 +10,34 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ## Architecture
 
+Likely caused by a few things Mermaid's parser can choke on:
+
+- **`**bold**` inside node labels** — not standard Mermaid syntax, can break parsing
+- **Emojis** — hit or miss depending on the renderer
+- **`·` middle dot** — can cause issues
+
+Here's a clean, safe version without those:
+
 ```mermaid
 flowchart TD
-    EB(["⏰ **EventBridge**\nEvery Monday 10am AEDT"])
-    FS["📋 **file_selector** Lambda\nBuilds download list\n*(yearly 1990–present + current week)*"]
-    FD["⬇️ **file_downloader** Lambda\nDownloads each ZIP directly\nfrom NSW Valuer General"]
-    ZS["🔍 **zip_scanner** Lambda\nRecursively unpacks nested ZIPs\nLocates all .dat files inside"]
-    DBI["💾 **db_ingestor** Lambda\nParses each .dat\nBatch-inserts 1,000 rows per txn into RDS"]
-    RDS[("🗄️ **RDS PostgreSQL 16**\nt3.micro")]
-    DLQ["☠️ **Dead Letter Queue**\nRetained 14 days"]
+    EB(["EventBridge — Every Monday 10am AEDT"])
+    FS["file_selector Lambda\nBuilds download list\nyearly 1990-present + current week"]
+    FD["file_downloader Lambda\nDownloads each ZIP directly\nfrom NSW Valuer General"]
+    ZS["zip_scanner Lambda\nRecursively unpacks nested ZIPs\nLocates all .dat files inside"]
+    DBI["db_ingestor Lambda\nParses each .dat\nBatch-inserts 1,000 rows per txn into RDS"]
+    RDS[("RDS PostgreSQL 16 — t3.micro")]
+    DLQ["Dead Letter Queue\nRetained 14 days"]
     subgraph DB ["Database Layers"]
         direction TB
-        RAW["nsw_property_sales_raw\n*raw .dat records, inserted as-is*"]
-        VW["vw_nsw_property_sales\n*normalised: parses semicolons,\nhandles pre/post-2001 formats,\nderives property_type, full address*"]
-        MV["mv_nsw_property_sales\n*materialised snapshot for performance*"]
-        AGG["mv_stats_agg · mv_quarterly_agg · mv_suburb_agg\n*pre-aggregated, refreshed weekly*"]
+        RAW["nsw_property_sales_raw\nraw .dat records, inserted as-is"]
+        VW["vw_nsw_property_sales\nnormalised: parses semicolons\nhandles pre/post-2001 formats\nderives property_type, full address"]
+        MV["mv_nsw_property_sales\nmaterialised snapshot for performance"]
+        AGG["mv_stats_agg / mv_quarterly_agg / mv_suburb_agg\npre-aggregated, refreshed weekly"]
     end
-    DASH(["📊 **Streamlit Dashboard**\nPre-agg queries · parallel execution · 10min cache"])
+    DASH(["Streamlit Dashboard\nPre-agg queries / parallel execution / 10min cache"])
     EB --> FS
-    FS -->|"Async invoke × N files"| FD
-    FD -->|"Saves raw ZIP to S3 → async invoke"| ZS
+    FS -->|"Async invoke x N files"| FD
+    FD -->|"Saves raw ZIP to S3 then async invoke"| ZS
     ZS -->|"1 SQS message per .dat file"| DBI
     DBI --> RDS
     DBI -->|"On failure after 1 retry"| DLQ
