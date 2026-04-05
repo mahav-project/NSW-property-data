@@ -1,273 +1,138 @@
+## NSW Property Sales
 
-## Overview
+An end-to-end data pipeline that ingests every NSW property sale recorded since 1990 — over **150,000 files processed**, **35+ years** of transactions, updated automatically every Monday.
 
-This project downloads, processes, and stores all NSW property sales records dating back to 1990. Data is sourced from the NSW Valuer General website, extracted from nested ZIP archives, parsed from `.dat` files, and loaded into a structured PostgreSQL database. The pipeline runs automatically every Monday and keeps the database up to date with the latest weekly release.
-
-Dashboard [WIP] : [https://nsw-property-data-mahavir.streamlit.app/](https://nsw-property-data.streamlit.app/)
+**Dashboard → [nsw-property-data.streamlit.app](https://nsw-property-data.streamlit.app/)**
+**Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)**
 
 ---
 
-## Cloud Technology
+## Architecture
 
-| Service | Purpose |
+```
+┌─────────────────────────────────────────────────────────────┐
+│           EventBridge — every Monday 10am AEDT              │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+               ┌───────────────────────┐
+               │     file_selector     │
+               │  Builds download list │
+               │  (yearly 1990–now     │
+               │   + latest weekly)    │
+               └───────────┬───────────┘
+                           │  Async invoke × N files
+                           ▼
+               ┌───────────────────────┐
+               │    file_downloader    │
+               │  Downloads ZIPs from  │
+               │  NSW Valuer General   │
+               └───────────┬───────────┘
+                           │  Saves to S3 → async invoke
+                           ▼
+               ┌───────────────────────┐
+               │      zip_scanner      │
+               │  Recursively unpacks  │
+               │  nested ZIPs, finds   │
+               │  all .dat files       │
+               └───────────┬───────────┘
+                           │  1 SQS message per .dat file
+                           ▼
+               ┌───────────────────────┐
+               │      db_ingestor      │
+               │  Parses .dat lines    │
+               │  Batch inserts 1,000  │
+               │  records per txn      │
+               └───────────┬───────────┘
+                           │  On failure (after 1 retry)
+                    ┌──────┴──────┐
+                    ▼             ▼
+              RDS PostgreSQL    Dead Letter
+              (PostgreSQL 16)   Queue (14d)
+                    │
+                    ▼
+    ┌─────────────────────────────────────┐
+    │         Database Layers             │
+    │                                     │
+    │  nsw_property_sales_raw             │  ← raw .dat records
+    │      ↓                              │
+    │  vw_nsw_property_sales              │  ← normalised view
+    │      ↓                              │
+    │  mv_nsw_property_sales              │  ← materialized snapshot
+    │      ↓                              │
+    │  mv_stats_agg                       │  ┐
+    │  mv_quarterly_agg                   │  ├─ pre-aggregated for dashboard
+    │  mv_suburb_agg                      │  ┘
+    └─────────────────────────────────────┘
+                    │
+                    ▼
+    ┌─────────────────────────────────────┐
+    │   Streamlit Dashboard               │
+    │   nsw-property-data.streamlit.app   │
+    │   Parallel queries · 10min cache    │
+    └─────────────────────────────────────┘
+```
+
+---
+
+## Stack
+
+| Layer | Tech |
 |---|---|
-| **AWS Lambda (Python 3.12)** | 4 serverless functions driving the entire pipeline |
-| **RDS (PostgreSQL 16)** | Stores all property sales records |
-| **S3** | Stores downloaded ZIP files and extracted `.dat` files |
-| **SQS** | Decouples ZIP scanning from database ingestion |
-| **EventBridge** | Weekly cron trigger (Monday 10am AEDT) |
-| **CloudWatch Dashboard** | Monitors Lambda errors and invocations |
-| **Terraform** | Infrastructure as Code for all AWS resources |
-
----
-
-## Architecture & Full Data Flow
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                  CloudWatch Event Rule                           │
-│         
-└─────────────────────────┬────────────────────────────────────────┘
-                          │
-                          ▼
-              ┌───────────────────────┐
-              │     file_selector     │
-              │  Generates task list  │
-              │  (yearly 1990–now +   │
-              │   weekly files)       │
-              └───────────┬───────────┘
-                          │  Async Lambda Invoke (×N files)
-                          ▼
-              ┌───────────────────────┐
-              │    file_downloader    │
-              │  Downloads .zip from  │
-              │  NSW Valuer General   │
-              │  → Stores in S3       │
-              └───────────┬───────────┘
-                          │  Async Lambda Invoke (×N files)
-                          ▼
-              ┌───────────────────────┐
-              │      zip_scanner      │
-              │  Recursively extracts │
-              │  .dat files from ZIPs │
-              │  → Sends SQS messages │
-              └───────────┬───────────┘
-                          │  SQS Event Source Mapping
-                          │  (max 10 concurrent)
-                          ▼
-              ┌───────────────────────┐
-              │      db_ingestor      │
-              │  Parses .dat records  │
-              │  Batch inserts into   │
-              │  RDS PostgreSQL       │
-              └───────────┬───────────┘
-                          │
-                          ▼
-         ┌─────────────────────────────────┐
-         │   PostgreSQL (AWS RDS)          │
-         │   nsw_property_sales_raw        │  ← raw ingestion table
-         │   vw_nsw_property_sales         │  ← normalised view
-         └─────────────────────────────────┘
-```
-
-### Error Handling
-
-```
-db_ingestor failure
-        │
-        ▼ (after 1 retry)
-┌──────────────────────┐
-│   Dead Letter Queue   │
-│  (14-day retention)  │
-└──────────────────────┘
-```
-
----
-
-## Folder Structure
-
-```
-NSW-property-data/
-├── database/
-│   └── schema.sql                  # PostgreSQL table + view definitions
-│
-├── functions/
-│   ├── requirements.txt            # Python dependencies (pg8000)
-│   ├── file_selector/
-│   │   └── handler.py              # Lambda: generates download task list
-│   ├── file_downloader/
-│   │   └── handler.py              # Lambda: downloads ZIPs from Valuer General
-│   ├── zip_scanner/
-│   │   └── handler.py              # Lambda: extracts .dat files, sends to SQS
-│   └── db_ingestor/
-│       └── handler.py              # Lambda: parses + batch inserts into RDS
-│
-└── terraform/
-    ├── main.tf                     # AWS provider configuration
-    ├── variables.tf                # Input variable definitions
-    ├── terraform.tfvars            # Variable values (credentials — gitignored)
-    ├── lambdas.tf                  # Lambda functions, IAM roles, CloudWatch trigger
-    ├── database.tf                 # RDS PostgreSQL instance
-    ├── storage.tf                  # S3 bucket
-    ├── queues.tf                   # SQS ingestion queue + DLQ
-    ├── layer.tf                    # Lambda layer (Python dependencies)
-    ├── dashboard.tf                # CloudWatch monitoring dashboard
-    └── outputs.tf                  # Output values (endpoints, ARNs)
-```
-
----
-
-## Lambda Functions
-
-### 1. `file_selector`
-- **Trigger**: CloudWatch cron — every Monday at 0:00 UTC (10am Sydney)
-- **Purpose**: Determines which files need to be downloaded
-- **Modes**: `full` (all years 1990–present) or `last_week` (default, latest weekly file only)
-- **Output**: Asynchronously invokes `file_downloader` for each file task
-
-### 2. `file_downloader`
-- **Trigger**: Async invocation from `file_selector`
-- **Purpose**: Downloads ZIP files from `https://www.valuergeneral.nsw.gov.au/__psi/`
-- **Output**: Saves to `s3://nsw-property-data/NSW/Download/{yearly|weekly}/`, then invokes `zip_scanner`
-
-### 3. `zip_scanner`
-- **Trigger**: Async invocation from `file_downloader`
-- **Purpose**: Recursively opens nested ZIP archives and locates all `.dat` files
-- **Output**: Sends one SQS message per `.dat` file with `{ bucket, key }`
-
-### 4. `db_ingestor`
-- **Trigger**: SQS event source mapping (max 10 concurrent executions)
-- **Purpose**: Downloads `.dat` file from S3, parses line-by-line, batch inserts into RDS
-- **Batch size**: 1,000 records per INSERT
-- **Error handling**: Rolls back transaction on failure; SQS retries once before DLQ
-
----
-
-## S3 Structure
-
-```
-s3://nsw-property-data/
-└── NSW/
-    └── Download/
-        ├── yearly/
-        │   ├── 1990.zip
-        │   ├── 1991.zip
-        │   └── ... (up to current year)
-        └── weekly/
-            ├── 20240101.zip
-            └── ... (latest weekly files)
-```
+| Pipeline | AWS Lambda (Python 3.12) × 4 functions |
+| Storage | S3 (raw ZIPs + .dat files) |
+| Queue | SQS + DLQ |
+| Database | RDS PostgreSQL 16 (t3.micro) |
+| Dashboard | Streamlit Cloud + Plotly |
+| IaC | Terraform |
+| Scheduler | EventBridge cron |
 
 ---
 
 ## Database
 
-**Engine**: PostgreSQL 16 on AWS RDS (t3.micro, 20GB)
+Raw `.dat` records land in `nsw_property_sales_raw` as-is. The normalised view `vw_nsw_property_sales` parses the semicolon-delimited lines, handles two historical formats (pre/post 2001 field layouts), constructs full addresses, and derives `property_type` (House vs Unit) from unit and strata fields.
 
-### Table: `nsw_property_sales_raw`
+Three pre-aggregated materialized views sit on top and power the dashboard queries:
 
-Raw ingestion table — each row stores one complete `.dat` record as-is.
-
-| Column | Type | Description |
+| View | Grain | Used for |
 |---|---|---|
-| `id` | SERIAL PRIMARY KEY | Auto-incrementing row ID |
-| `row_number` | INTEGER | Line number within source file |
-| `raw_line` | TEXT | Full raw record (semicolon-delimited) |
-| `source_file` | TEXT | S3 path to the source `.dat` file |
-| `ingested_at` | TIMESTAMP | UTC timestamp of ingestion |
+| `mv_stats_agg` | year + postcode + type | KPI cards |
+| `mv_quarterly_agg` | quarter + year + postcode + type | Volume + price trend charts |
+| `mv_suburb_agg` | suburb + year + postcode + type | Top 10 suburbs chart |
 
-### View: `vw_nsw_property_sales`
-
-Normalised view that parses `raw_line` into structured columns. Supports two historical data formats automatically (field count determines format).
-
-**Identifiers**
-
-| Column | Description |
-|---|---|
-| `district_code` | NSW land district code |
-| `property_id` | Unique property identifier |
-| `sale_counter` | Sale transaction counter |
-| `file_format` | `current_2001_to_present` or `archived_1990_to_2001` |
-
-**Property & Address**
-
-| Column | Description |
-|---|---|
-| `property_name` | Official property name |
-| `unit_number` | Unit/apartment number |
-| `house_number` | Street number |
-| `street_name` | Street name |
-| `suburb` | Suburb/locality |
-| `post_code` | Postal code |
-| `full_address` | Constructed address (e.g. `Unit 3, 82 Tamworth St, Abermain NSW 2326`) |
-
-**Dates**
-
-| Column | Type | Description |
-|---|---|---|
-| `contract_date` | DATE | Contract date (handles DD/MM/YYYY and YYYYMMDD) |
-| `settlement_date` | DATE | Settlement date |
-
-**Financials & Land**
-
-| Column | Type | Description |
-|---|---|---|
-| `purchase_price` | NUMERIC | Sale price in AUD |
-| `area` | NUMERIC | Property area/size |
-| `area_type` | TEXT | Unit of area (e.g. square meters) |
-| `dimensions` | TEXT | Property dimensions (archived format only) |
-| `land_description` | TEXT | Land description (archived format only) |
-
-**Classification**
-
-| Column | Description |
-|---|---|
-| `zone_code` | Zoning classification |
-| `nature_of_property` | Property type (residential, commercial, etc.) |
-| `primary_purpose` | Intended use |
-| `strata_lot_number` | Strata lot identifier |
-
-**Sale Details**
-
-| Column | Description |
-|---|---|
-| `sale_code` | Sale transaction code |
-| `percent_interest_of_sale` | Percentage interest sold (defaults to 100) |
-| `dealing_number` | Land dealings reference number |
+Each stores `sales_count`, `price_sum`, and `median_price` so re-aggregation across any filter combination stays accurate. All four MVs are refreshed in sequence every Monday after ingestion completes.
 
 ---
 
-## Monitoring
+## Dashboard
 
-A CloudWatch Dashboard (`NSWPropertyDataPipeline`) tracks the following metrics across all 4 Lambda functions:
+Filters by year, postcode, and property type. Three queries run in parallel via `ThreadPoolExecutor` and results are cached for 10 minutes.
 
-- **Errors** — total error count per function
-- **Invocations** — total invocation count per function
+- **KPIs** — total sales, average price, median price
+- **Sale Volume by Quarter** — stacked bar (House vs Unit)
+- **Median Price by Quarter** — dual-line trend
+- **Top 10 Suburbs** — horizontal stacked bar
+- **Recent 50 Sales** — transaction table with address, price, area, and dates
 
 ---
 
-## Infrastructure (Terraform)
+## Repo Structure
 
-All AWS resources are defined in Terraform under `terraform/`. To deploy:
+```
+├── functions/          4 Lambda handlers + shared requirements
+├── database/           schema, materialized views, indexes, refresh scripts
+├── streamlit/          dashboard.py, queries.py, db.py
+└── terraform/          all AWS infrastructure as code
+```
+
+---
+
+## Deploy
 
 ```bash
 cd terraform
-terraform init
-terraform plan
-terraform apply
+terraform init && terraform apply
 ```
 
-Key resources created:
-- 4 Lambda functions with IAM roles and policies
-- 1 RDS PostgreSQL instance
-- 1 S3 bucket
-- 2 SQS queues (main + DLQ)
-- 1 CloudWatch Event Rule (weekly cron)
-- 1 CloudWatch Dashboard
-- 1 Lambda Layer (Python dependencies)
-
----
-
-## Future Plans — Property Dashboard
-
-The next phase of this project is to build an interactive **property data dashboard** hosted on an **AWS EC2 instance**, built entirely in Python.
+Creates: 4 Lambdas, RDS instance, S3 bucket, SQS + DLQ, EventBridge rule, CloudWatch dashboard, Lambda layer.
