@@ -156,6 +156,7 @@ try:
             st.plotly_chart(fig, use_container_width=True)
 
         #Recent Sales
+    with st.spinner("Loading data..."):
         with st.container():
             st.subheader("Recent 50 Sales")
             f_sales = get_recent_sales(years_to_query, postcodes_to_query, property_type_to_query)
