@@ -10,33 +10,7 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ## Architecture
 
-
-```mermaid
-flowchart TD
-    EB(["EventBridge — Every Monday 10am AEDT"])
-    FS["file_selector Lambda\nBuilds download list\nyearly 1990-present + current week"]
-    FD["file_downloader Lambda\nDownloads each ZIP directly\nfrom NSW Valuer General"]
-    ZS["zip_scanner Lambda\nRecursively unpacks nested ZIPs\nLocates all .dat files inside"]
-    DBI["db_ingestor Lambda\nParses each .dat\nBatch-inserts 1,000 rows per txn into RDS"]
-    RDS[("RDS PostgreSQL 16 — t3.micro")]
-    DLQ["Dead Letter Queue\nRetained 14 days"]
-    subgraph DB ["Database Layers"]
-        direction TB
-        RAW["nsw_property_sales_raw\nraw .dat records, inserted as-is"]
-        VW["vw_nsw_property_sales\nnormalised: parses semicolons\nhandles pre/post-2001 formats\nderives property_type, full address"]
-        MV["mv_nsw_property_sales\nmaterialised snapshot for performance"]
-        AGG["mv_stats_agg / mv_quarterly_agg / mv_suburb_agg\npre-aggregated, refreshed weekly"]
-    end
-    DASH(["Streamlit Dashboard\nPre-agg queries / parallel execution / 10min cache"])
-    EB --> FS
-    FS -->|"Async invoke x N files"| FD
-    FD -->|"Saves raw ZIP to S3 then async invoke"| ZS
-    ZS -->|"1 SQS message per .dat file"| DBI
-    DBI --> RDS
-    DBI -->|"On failure after 1 retry"| DLQ
-    RDS --> RAW --> VW --> MV --> AGG
-    AGG --> DASH
-```
+![NSW Property ETL Flowchart](images/NSW Property Sale Data-2026-04-05-022556.png)
 ---
 
 ## AWS Components
