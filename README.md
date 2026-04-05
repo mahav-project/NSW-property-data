@@ -98,8 +98,8 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ### Why this shape?
 
-- **fan-out via async Lambda invokes** — file_selector triggers one file_downloader per file in parallel, so 150K+ files don't queue up sequentially
-- **SQS between scanner and ingestor** — absorbs bursts, provides natural retry/DLQ boundary, and lets Lambda scale concurrency independently per stage
+- **fan-out via async Lambda invokes** — file_selector triggers one file_downloader per file in parallel, so files don't queue up sequentially
+- **SQS between scanner and ingestor** — absorbs bursts, provides natural retry/DLQ boundary, and lets Lambda scale concurrency independently 
 - **batch inserts of 1,000 rows** — amortises RDS round-trip cost without hitting transaction size limits
 - **pre-aggregated MVs** — dashboard queries hit small pre-rolled tables instead of scanning millions of raw rows on every page load
 
