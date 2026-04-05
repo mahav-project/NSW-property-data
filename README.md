@@ -10,77 +10,32 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    EB(["⏰ **EventBridge**\nEvery Monday 10am AEDT"])
+    FS["📋 **file_selector** Lambda\nBuilds download list\n*(yearly 1990–present + current week)*"]
+    FD["⬇️ **file_downloader** Lambda\nDownloads each ZIP directly\nfrom NSW Valuer General"]
+    ZS["🔍 **zip_scanner** Lambda\nRecursively unpacks nested ZIPs\nLocates all .dat files inside"]
+    DBI["💾 **db_ingestor** Lambda\nParses each .dat\nBatch-inserts 1,000 rows per txn into RDS"]
+    RDS[("🗄️ **RDS PostgreSQL 16**\nt3.micro")]
+    DLQ["☠️ **Dead Letter Queue**\nRetained 14 days"]
+    subgraph DB ["Database Layers"]
+        direction TB
+        RAW["nsw_property_sales_raw\n*raw .dat records, inserted as-is*"]
+        VW["vw_nsw_property_sales\n*normalised: parses semicolons,\nhandles pre/post-2001 formats,\nderives property_type, full address*"]
+        MV["mv_nsw_property_sales\n*materialised snapshot for performance*"]
+        AGG["mv_stats_agg · mv_quarterly_agg · mv_suburb_agg\n*pre-aggregated, refreshed weekly*"]
+    end
+    DASH(["📊 **Streamlit Dashboard**\nPre-agg queries · parallel execution · 10min cache"])
+    EB --> FS
+    FS -->|"Async invoke × N files"| FD
+    FD -->|"Saves raw ZIP to S3 → async invoke"| ZS
+    ZS -->|"1 SQS message per .dat file"| DBI
+    DBI --> RDS
+    DBI -->|"On failure after 1 retry"| DLQ
+    RDS --> RAW --> VW --> MV --> AGG
+    AGG --> DASH
 ```
-┌─────────────────────────────────────────────────────────────┐
-│           EventBridge — every Monday 10am AEDT              │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-               ┌───────────────────────┐
-               │     file_selector     │
-               │  Lambda — builds the  │
-               │  download list:       │
-               │  yearly 1990–present  │
-               │  + current week       │
-               └───────────┬───────────┘
-                           │  Async invoke × N files
-                           ▼
-               ┌───────────────────────┐
-               │    file_downloader    │
-               │  Lambda — downloads   │
-               │  each ZIP directly    │
-               │  from NSW Valuer Gen  │
-               └───────────┬───────────┘
-                           │  Saves raw ZIP to S3
-                           │  → async invoke
-                           ▼
-               ┌───────────────────────┐
-               │      zip_scanner      │
-               │  Lambda — recursively │
-               │  unpacks nested ZIPs, │
-               │  locates all .dat     │
-               │  files inside         │
-               └───────────┬───────────┘
-                           │  1 SQS message per .dat file
-                           ▼
-               ┌───────────────────────┐
-               │      db_ingestor      │
-               │  Lambda — parses each │
-               │  .dat, batch-inserts  │
-               │  1,000 rows per txn   │
-               │  into RDS             │
-               └──────────┬────────────┘
-                          │               On failure (after 1 retry)
-                   ┌──────┴────────────────────────┐
-                   ▼                               ▼
-           RDS PostgreSQL 16                Dead Letter Queue
-           (t3.micro)                       (retained 14 days)
-                   │
-                   ▼
-   ┌─────────────────────────────────────┐
-   │           Database Layers           │
-   │                                     │
-   │  nsw_property_sales_raw             │  ← raw .dat records, inserted as-is
-   │      ↓                              │
-   │  vw_nsw_property_sales              │  ← normalised: parses semicolons,
-   │                                     │    handles pre/post-2001 formats,
-   │                                     │    derives property_type, full address
-   │      ↓                              │
-   │  mv_nsw_property_sales              │  ← materialized snapshot for performance
-   │      ↓                              │
-   │  mv_stats_agg                       │  ┐
-   │  mv_quarterly_agg                   │  ├─ pre-aggregated, refreshed weekly
-   │  mv_suburb_agg                      │  ┘
-   └─────────────────────────────────────┘
-                   │
-                   ▼
-   ┌─────────────────────────────────────┐
-   │        Streamlit Dashboard          │
-   │   Pre-agg queries · parallel        │
-   │   execution · 10min cache           │
-   └─────────────────────────────────────┘
-```
-
 ---
 
 ## AWS Components
