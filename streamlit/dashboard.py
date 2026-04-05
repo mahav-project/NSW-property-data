@@ -23,7 +23,7 @@ col1, col2, col3 = st.columns(3)
 selected_years = col1.multiselect(
     "Years",
     options=years,
-    default=[2025 , 2026],
+    default=[],
     placeholder="All Years"
 )
 
@@ -48,17 +48,16 @@ property_type_to_query = selected_property_type if selected_property_type else [
 
 
 def get_all_data(years, postcodes, property_types):
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         f_stats  = executor.submit(get_sales_stats,   years, postcodes, property_types)
-        f_sales  = executor.submit(get_recent_sales,  years, postcodes, property_types)
         f_suburb = executor.submit(get_suburb_stats,  years, postcodes, property_types)
         f_trends = executor.submit(get_price_trends,  years, postcodes, property_types)
-    return f_stats.result(), f_sales.result(), f_suburb.result(), f_trends.result()
+    return f_stats.result(),  f_suburb.result(), f_trends.result()
 
 try:
     with st.spinner("Loading data..."):
         start = time.perf_counter()
-        f_stats, f_sales, f_suburb, f_trends = get_all_data(years_to_query, postcodes_to_query, property_type_to_query)
+        f_stats, f_suburb, f_trends = get_all_data(years_to_query, postcodes_to_query, property_type_to_query)
         elapsed_ms = (time.perf_counter() - start) * 1000
         st.caption(f"⚡ Loaded in {elapsed_ms:.0f}ms")
         # Overall Stats
@@ -159,6 +158,7 @@ try:
         #Recent Sales
         with st.container():
             st.subheader("Recent 50 Sales")
+            f_sales = get_recent_sales(years_to_query, postcodes_to_query, property_type_to_query)
 
             columns, rows = f_sales
             table_data = [dict(zip(columns, row)) for row in rows]

@@ -10,10 +10,10 @@ def get_sales_stats(years, postcodes, property_types):
     """
     query = """
         SELECT
-            COUNT(*),
-            AVG(purchase_price),
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY purchase_price)
-        FROM mv_nsw_property_sales
+            SUM(sales_count),
+            SUM(price_sum) / NULLIF(SUM(sales_count), 0),
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY median_price)
+        FROM mv_stats_agg
         WHERE contract_year = ANY(%s)
           AND post_code = ANY(%s)
           AND property_type = ANY(%s)
@@ -71,17 +71,18 @@ def get_suburb_stats(years, postcodes, property_types):
     query = """
         WITH top_suburbs AS (
             SELECT suburb
-            FROM mv_nsw_property_sales
+            FROM mv_suburb_agg
             WHERE post_code = ANY(%s)
               AND contract_year = ANY(%s)
               AND property_type = ANY(%s)
             GROUP BY suburb
-            ORDER BY COUNT(*) DESC
+            ORDER BY SUM(sales_count) DESC
             LIMIT 10
         )
-        SELECT m.suburb, m.property_type, COUNT(*) AS sales_count,
-               PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY m.purchase_price) AS median_price
-        FROM mv_nsw_property_sales m
+        SELECT m.suburb, m.property_type,
+               SUM(m.sales_count) AS sales_count,
+               PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY m.median_price) AS median_price
+        FROM mv_suburb_agg m
         JOIN top_suburbs t ON m.suburb = t.suburb
         WHERE m.post_code = ANY(%s)
           AND m.contract_year = ANY(%s)
@@ -106,11 +107,11 @@ def get_price_trends(years, postcodes, property_types):
     """
     query = """
         SELECT
-            DATE_TRUNC('quarter', contract_date)                         AS contract_quarter,
+            contract_quarter,
             property_type,
-            COUNT(*)                                                     AS sales_count,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY purchase_price) AS median_price
-        FROM mv_nsw_property_sales
+            SUM(sales_count)                                                    AS sales_count,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY median_price)           AS median_price
+        FROM mv_quarterly_agg
         WHERE post_code     = ANY(%s)
           AND contract_year = ANY(%s)
           AND property_type = ANY(%s)
