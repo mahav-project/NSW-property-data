@@ -24,7 +24,8 @@ if [ ! -d "$PYTHON_PATH/pg8000" ]; then
 fi
 
 rm -f "$ZIP_PATH"
-cd "$BUILD_PATH" && zip -r "$(cd - > /dev/null && echo "$ZIP_PATH")" python/
+ZIP_ABS="$(cd "$(dirname "$ZIP_PATH")" && pwd)/$(basename "$ZIP_PATH")"
+cd "$BUILD_PATH" && zip -r "$ZIP_ABS" python/
 
 if [ ! -f "$ZIP_PATH" ]; then
   echo "Layer zip was not created" >&2
