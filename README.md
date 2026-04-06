@@ -19,6 +19,23 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 | **CloudWatch** | Dashboard + Lambda execution metrics |
 | **Terraform** | All infrastructure defined as code, GitHub Actions for Automated Deployment|
 
+## CI/CD
+
+Two GitHub Actions pipelines automate deployments on merge to master:
+
+**Infrastructure** — triggers when `terraform/` or `functions/` change
+| Event | Action |
+|---|---|
+| **Pull request** | Runs `terraform plan` and posts the output as a PR comment for review |
+| **Merge to master** | Runs `terraform apply` — deploys infrastructure and redeploys only the Lambda functions whose code changed |
+
+**Database** — triggers when `database/` changes
+| Event | Action |
+|---|---|
+| **Merge to master** | Runs SQL files in order: schema/views → materialized views → aggregation views → indexes |
+
+Terraform state is stored remotely in S3 (`nsw-property-terraform-state`). All SQL files are idempotent — views are replaced and materialized views are dropped and recreated on each run.
+
 ## Dashboard
 Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, results cached for 10 minutes, backed by pre-aggregated materialized views so page loads stay fast regardless of filter combination.
 
@@ -45,24 +62,5 @@ Raw `.dat` records land in `nsw_property_sales_raw` unchanged. A normalised view
 ├── streamlit/          dashboard app
 └── terraform/          all AWS infrastructure as code
 ```
-
-## CI/CD
-
-Two GitHub Actions pipelines automate deployments on merge to master:
-
-**Infrastructure** — triggers when `terraform/` or `functions/` change
-| Event | Action |
-|---|---|
-| **Pull request** | Runs `terraform plan` and posts the output as a PR comment for review |
-| **Merge to master** | Runs `terraform apply` — deploys infrastructure and redeploys only the Lambda functions whose code changed |
-
-**Database** — triggers when `database/` changes
-| Event | Action |
-|---|---|
-| **Merge to master** | Runs SQL files in order: schema/views → materialized views → aggregation views → indexes |
-
-Terraform state is stored remotely in S3 (`nsw-property-terraform-state`). All SQL files are idempotent — views are replaced and materialized views are dropped and recreated on each run.
-
-
 
 ## Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)
