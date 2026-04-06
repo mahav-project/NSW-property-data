@@ -215,6 +215,6 @@ from
 
 
 
-CREATE MATERIALIZED VIEW mv_nsw_property_sales AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_nsw_property_sales AS
 SELECT *
 FROM vw_nsw_property_sales;

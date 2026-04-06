@@ -46,13 +46,19 @@ Raw `.dat` records land in `nsw_property_sales_raw` unchanged. A normalised view
 └── terraform/          all AWS infrastructure as code
 ```
 
-## Deploy
+## CI/CD
 
-```bash
-cd terraform
-terraform init && terraform apply
-```
+A GitHub Actions pipeline automates Terraform deployments. It triggers only when files in `terraform/` or `functions/` change.
 
-Creates: 4 Lambdas, RDS instance, S3 bucket, SQS + DLQ, EventBridge rule, CloudWatch dashboard, Lambda layer.
+| Event | Action |
+|---|---|
+| **Pull request** | Runs `terraform plan` and posts the output as a PR comment for review |
+| **Merge to master** | Runs `terraform apply` to deploy infrastructure and Lambda changes |
 
-**Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)**
+Terraform state is stored remotely in S3 (`nsw-property-terraform-state`) so both local runs and the pipeline share the same state. Lambda functions are redeployed only when their code changes, detected via `source_code_hash`.
+
+Three repository secrets are required: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `DB_PASSWORD`.
+
+
+
+## Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)**
