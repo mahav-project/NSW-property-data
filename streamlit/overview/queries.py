@@ -4,10 +4,6 @@ from db import get_connection
 
 @st.cache_data(ttl=600)
 def get_sales_stats(years, postcodes, property_types):
-    """
-    Returns the total number of sales, average price, and median price
-    for the given years, postcodes, and property types.
-    """
     query = """
         SELECT
             SUM(sales_count),
@@ -29,10 +25,6 @@ def get_sales_stats(years, postcodes, property_types):
 
 @st.cache_data(ttl=600)
 def get_recent_sales(years, postcodes, property_types):
-    """
-    Returns the 50 most recent sales for the given years, postcodes, and property types.
-    Results are ordered by settlement date, most recent first.
-    """
     query = """
         SELECT
             settlement_date                AS "Settlement Date",
@@ -48,7 +40,7 @@ def get_recent_sales(years, postcodes, property_types):
           AND settlement_year = ANY(%s)
           AND post_code       = ANY(%s)
           AND property_type   = ANY(%s)
-        ORDER BY settlement_date DESC NULLS LAST
+        ORDER BY settlement_year DESC NULLS LAST
         LIMIT 50
     """
 
@@ -64,10 +56,6 @@ def get_recent_sales(years, postcodes, property_types):
 
 @st.cache_data(ttl=600)
 def get_suburb_stats(years, postcodes, property_types):
-    """
-    Returns sales count and median price grouped by suburb.
-    """
-    # First find the top 20 suburbs by total sales, then get the House/Unit breakdown for those suburbs
     query = """
         WITH top_suburbs AS (
             SELECT suburb
@@ -102,9 +90,6 @@ def get_suburb_stats(years, postcodes, property_types):
 
 @st.cache_data(ttl=600)
 def get_price_trends(years, postcodes, property_types):
-    """
-    Returns median price by contract year and property type.
-    """
     query = """
         SELECT
             contract_year,
