@@ -36,7 +36,7 @@ Terraform state is stored remotely in S3 (`nsw-property-terraform-state`).
 |---|---|
 | **Merge to master** | Runs SQL files in order: schema/views → materialized views → aggregation views → indexes |
 
-All SQL files are idempotent — views are replaced and materialized views are dropped and recreated on each run.
+Every time the SQL runs, it safely rebuilds everything from scratch — views are swapped out and materialized views are deleted then recreated.
 
 ## Dashboard
 Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, results cached for 10 minutes, backed by pre-aggregated materialized views so page loads stay fast regardless of filter combination.
