@@ -27,12 +27,12 @@ rm -f "$ZIP_PATH"
 ZIP_ABS="$(cd "$(dirname "$ZIP_PATH")" && pwd)/$(basename "$ZIP_PATH")"
 cd "$BUILD_PATH" && zip -r "$ZIP_ABS" python/
 
-if [ ! -f "$ZIP_PATH" ]; then
+if [ ! -f "$ZIP_ABS" ]; then
   echo "Layer zip was not created" >&2
   exit 1
 fi
 
-echo "Layer built successfully at $ZIP_PATH"
+echo "Layer built successfully at $ZIP_ABS"
 EOT
   }
 }
