@@ -4,7 +4,6 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 
 **Dashboard → [nsw-property-data.streamlit.app](https://nsw-property-data.streamlit.app/)**
 
-**Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)**
 
 ## AWS Components
 
@@ -55,3 +54,5 @@ terraform init && terraform apply
 ```
 
 Creates: 4 Lambdas, RDS instance, S3 bucket, SQS + DLQ, EventBridge rule, CloudWatch dashboard, Lambda layer.
+
+**Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)**
