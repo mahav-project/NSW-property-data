@@ -17,7 +17,7 @@ An end-to-end data pipeline that ingests every NSW property sale recorded since 
 | **RDS PostgreSQL 16** | t3.micro  — stores all sales data |
 | **Lambda Layer** | Shared Python dependencies across all functions |
 | **CloudWatch** | Dashboard + Lambda execution metrics |
-| **Terraform** | All infrastructure defined as code, single `terraform apply` deploy |
+| **Terraform** | All infrastructure defined as code, GitHub Actions for Automated Deployment|
 
 ## Dashboard
 Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, results cached for 10 minutes, backed by pre-aggregated materialized views so page loads stay fast regardless of filter combination.
@@ -48,17 +48,21 @@ Raw `.dat` records land in `nsw_property_sales_raw` unchanged. A normalised view
 
 ## CI/CD
 
-A GitHub Actions pipeline automates Terraform deployments. It triggers only when files in `terraform/` or `functions/` change.
+Two GitHub Actions pipelines automate deployments on merge to master:
 
+**Infrastructure** — triggers when `terraform/` or `functions/` change
 | Event | Action |
 |---|---|
 | **Pull request** | Runs `terraform plan` and posts the output as a PR comment for review |
-| **Merge to master** | Runs `terraform apply` to deploy infrastructure and Lambda changes |
+| **Merge to master** | Runs `terraform apply` — deploys infrastructure and redeploys only the Lambda functions whose code changed |
 
-Terraform state is stored remotely in S3 (`nsw-property-terraform-state`) so both local runs and the pipeline share the same state. Lambda functions are redeployed only when their code changes, detected via `source_code_hash`.
+**Database** — triggers when `database/` changes
+| Event | Action |
+|---|---|
+| **Merge to master** | Runs SQL files in order: schema/views → materialized views → aggregation views → indexes |
 
-Three repository secrets are required: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `DB_PASSWORD`.
+Terraform state is stored remotely in S3 (`nsw-property-terraform-state`). All SQL files are idempotent — views are replaced and materialized views are dropped and recreated on each run.
 
 
 
-## Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)**
+## Data source → [NSW Valuer General](https://valuation.property.nsw.gov.au/embed/propertySalesInformation)

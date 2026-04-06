@@ -5,9 +5,9 @@ CREATE TABLE IF NOT EXISTS nsw_property_sales_raw (
     source_file TEXT            NOT NULL,
     ingested_at TIMESTAMP       NOT NULL
 );
+
 create or replace
 view public.vw_nsw_property_sales as
-
 with deduped as (
 select
 	distinct
@@ -212,9 +212,3 @@ from
         when sc >= 24 then to_date(contract_date_raw, 'YYYYMMDD')
         else to_date(contract_date_raw, 'DD/MM/YYYY')
     end <= CURRENT_DATE;
-
-
-
-CREATE MATERIALIZED VIEW IF NOT EXISTS mv_nsw_property_sales AS
-SELECT *
-FROM vw_nsw_property_sales;

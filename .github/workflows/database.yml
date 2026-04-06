@@ -1,0 +1,36 @@
+# name: Database
+
+# on:
+#   push:
+#     branches: [master]
+#     paths:
+#       - "database/**"
+
+# jobs:
+#   deploy:
+#     name: Deploy SQL Changes
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: Install psql
+#         run: sudo apt-get install -y postgresql-client
+
+#       - name: Run SQL files
+#         env:
+#           PGHOST: ${{ secrets.DB_HOST }}
+#           PGPORT: "5432"
+#           PGUSER: ${{ secrets.DB_USERNAME }}
+#           PGPASSWORD: ${{ secrets.DB_PASSWORD }}
+#           PGDATABASE: ${{ secrets.DB_NAME }}
+#         run: |
+#           echo "Running schema.sql..."
+#           psql -f database/schema.sql
+
+#           echo "Running agg_views.sql..."
+#           psql -f database/agg_views.sql
+
+#           echo "Running indexes.sql..."
+#           psql -f database/indexes.sql
+
+#           echo "Done."

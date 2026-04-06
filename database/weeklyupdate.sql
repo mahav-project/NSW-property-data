@@ -1,0 +1,4 @@
+REFRESH MATERIALIZED VIEW mv_nsw_property_sales;
+REFRESH MATERIALIZED VIEW mv_stats_agg;
+REFRESH MATERIALIZED VIEW mv_quarterly_agg;
+REFRESH MATERIALIZED VIEW mv_suburb_agg;
