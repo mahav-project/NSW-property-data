@@ -4,41 +4,35 @@ resource "null_resource" "build_layer" {
   }
 
   provisioner "local-exec" {
-    interpreter = ["PowerShell", "-Command"]
+    interpreter = ["bash", "-c"]
     command = <<EOT
-      $buildPath = "${path.module}/.build/layer"
-      $pythonPath = "$buildPath/python"
-      $zipPath = "${path.module}/.build/layer.zip"
+set -e
+BUILD_PATH="${path.module}/.build/layer"
+PYTHON_PATH="$BUILD_PATH/python"
+ZIP_PATH="${path.module}/.build/layer.zip"
 
-      Write-Host "Building Lambda layer..."
+echo "Building Lambda layer..."
 
-      # Clean build folder
-      if (Test-Path $buildPath) { Remove-Item -Recurse -Force $buildPath }
-      New-Item -ItemType Directory -Force $pythonPath | Out-Null
+rm -rf "$BUILD_PATH"
+mkdir -p "$PYTHON_PATH"
 
-      # Install dependencies
-      pip install -r "${path.module}/../functions/requirements.txt" -t $pythonPath
+pip install -r "${path.module}/../functions/requirements.txt" -t "$PYTHON_PATH"
 
-      # Ensure install worked
-      if (!(Test-Path "$pythonPath/pg8000")) {
-        Write-Error "pg8000 not installed correctly"
-        exit 1
-      }
+if [ ! -d "$PYTHON_PATH/pg8000" ]; then
+  echo "pg8000 not installed correctly" >&2
+  exit 1
+fi
 
-      # Remove old zip
-      if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
+rm -f "$ZIP_PATH"
+cd "$BUILD_PATH" && zip -r "$(cd - > /dev/null && echo "$ZIP_PATH")" python/
 
-      # Zip correctly (IMPORTANT: include python folder itself)
-      Compress-Archive -Path "$pythonPath" -DestinationPath $zipPath
+if [ ! -f "$ZIP_PATH" ]; then
+  echo "Layer zip was not created" >&2
+  exit 1
+fi
 
-      # Verify zip exists
-      if (!(Test-Path $zipPath)) {
-        Write-Error "Layer zip was not created"
-        exit 1
-      }
-
-      Write-Host "Layer built successfully at $zipPath"
-    EOT
+echo "Layer built successfully at $ZIP_PATH"
+EOT
   }
 }
 
