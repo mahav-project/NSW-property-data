@@ -29,12 +29,14 @@ Two GitHub Actions pipelines automate deployments on merge to master:
 | **Pull request** | Runs `terraform plan` and posts the output as a PR comment for review |
 | **Merge to master** | Runs `terraform apply` — deploys infrastructure and redeploys only the Lambda functions whose code changed |
 
+Terraform state is stored remotely in S3 (`nsw-property-terraform-state`). 
+
 **Database** — triggers when `database/` changes
 | Event | Action |
 |---|---|
 | **Merge to master** | Runs SQL files in order: schema/views → materialized views → aggregation views → indexes |
 
-Terraform state is stored remotely in S3 (`nsw-property-terraform-state`). All SQL files are idempotent — views are replaced and materialized views are dropped and recreated on each run.
+All SQL files are idempotent — views are replaced and materialized views are dropped and recreated on each run.
 
 ## Dashboard
 Built on Streamlit Cloud — queries run in parallel via `ThreadPoolExecutor`, results cached for 10 minutes, backed by pre-aggregated materialized views so page loads stay fast regardless of filter combination.
