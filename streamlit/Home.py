@@ -1,4 +1,5 @@
 import streamlit as st
+from db import get_connection
 
 st.set_page_config(page_title="NSW Property Sales", layout="wide")
 
@@ -20,3 +21,39 @@ Use the sidebar to navigate between pages.
 - Downloadable reports
 - Interactive map view
 """)
+
+
+@st.cache_data(ttl=600)
+def get_recent_sales():
+    query = """
+        SELECT
+            settlement_date    AS "Settlement Date",
+            contract_date      AS "Contract Date",
+            full_address       AS "Address",
+            suburb             AS "Suburb",
+            post_code          AS "Postcode",
+            property_type      AS "Type",
+            concat('$', purchase_price) AS "Price",
+            percent_interest_of_sale    AS "% Interest Sold",
+            area               AS "Area",
+            primary_purpose    AS "Primary Purpose",
+            zone_code          AS "Zone",
+            nature_of_property AS "Nature of Property"
+        FROM mv_recent_sales
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(query)
+    columns = [col.name for col in cursor.description]
+    rows = cursor.fetchall()
+    return columns, rows
+
+
+st.subheader("Recent Sales — Sample Data")
+
+try:
+    columns, rows = get_recent_sales()
+    table_data = [dict(zip(columns, row)) for row in rows]
+    st.dataframe(table_data, use_container_width=True, hide_index=True)
+except Exception as error:
+    st.error("Database error: " + str(error))

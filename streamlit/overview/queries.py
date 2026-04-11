@@ -23,36 +23,6 @@ def get_sales_stats(years, postcodes, property_types):
     return total_sales, average_price, median_price
 
 
-@st.cache_data(ttl=600)
-def get_recent_sales(years, postcodes, property_types):
-    query = """
-        SELECT
-            settlement_date                AS "Settlement Date",
-            contract_date                  AS "Contract Date",
-            full_address                   AS "Address",
-            property_type                  AS "Type",
-            concat('$', purchase_price)    AS "Price",
-            percent_interest_of_sale       AS "%% Interest Sold",
-            concat(area, ' ', area_type)   AS "Area",
-            COALESCE(primary_purpose, '-') AS "Primary Purpose"
-        FROM mv_nsw_property_sales
-        WHERE contract_year   = ANY(%s)
-          AND settlement_year = ANY(%s)
-          AND post_code       = ANY(%s)
-          AND property_type   = ANY(%s)
-        ORDER BY settlement_year DESC NULLS LAST
-        LIMIT 50
-    """
-
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(query, (years, years, postcodes, property_types))
-
-    columns = [col.name for col in cursor.description]
-    rows = cursor.fetchall()
-
-    return columns, rows
-
 
 @st.cache_data(ttl=600)
 def get_suburb_stats(years, postcodes, property_types):

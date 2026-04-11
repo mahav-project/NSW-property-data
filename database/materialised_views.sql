@@ -47,3 +47,23 @@ SELECT
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY purchase_price) AS median_price
 FROM mv_nsw_property_sales
 GROUP BY suburb, contract_year, post_code, property_type;
+
+
+DROP MATERIALIZED VIEW IF EXISTS mv_recent_sales;
+CREATE MATERIALIZED VIEW mv_recent_sales AS
+SELECT
+    settlement_date,
+    contract_date,
+    full_address,
+    suburb,
+    post_code,
+    property_type,
+    purchase_price,
+    percent_interest_of_sale,
+    concat(area, ' ', area_type) AS area,
+    COALESCE(primary_purpose, '-') AS primary_purpose,
+    COALESCE(zone_code, '-') AS zone_code,
+    COALESCE(nature_of_property, '-') AS nature_of_property
+FROM mv_nsw_property_sales
+ORDER BY settlement_date DESC NULLS LAST, contract_date DESC NULLS LAST
+LIMIT 50;

@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from concurrent.futures import ThreadPoolExecutor
 import time
 
-from overview.queries import get_sales_stats, get_recent_sales, get_suburb_stats, get_price_trends
+from overview.queries import get_sales_stats, get_suburb_stats, get_price_trends
 
 
 def _load_data(years, postcodes, property_types):
@@ -142,13 +142,6 @@ def render(years, postcodes, property_types):
                     height=400,
                 )
                 st.plotly_chart(fig_sub_price, use_container_width=True)
-
-        # Recent Sales
-        st.subheader("Recent 50 Sales")
-        f_sales = get_recent_sales(years, postcodes, property_types)
-        columns, rows = f_sales
-        table_data = [dict(zip(columns, row)) for row in rows]
-        st.dataframe(table_data, use_container_width=True, hide_index=True)
 
     except Exception as error:
         st.error("Database error: " + str(error))
