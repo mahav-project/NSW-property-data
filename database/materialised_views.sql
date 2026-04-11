@@ -62,8 +62,8 @@ SELECT
     percent_interest_of_sale,
     concat(area, ' ', area_type) AS area,
     COALESCE(primary_purpose, '-') AS primary_purpose,
-    COALESCE(zone_code, '-') AS zone_code,
-    COALESCE(nature_of_property, '-') AS nature_of_property
+    COALESCE(zone_code, '-') AS zone_code
 FROM mv_nsw_property_sales
+WHERE settlement_date <= CURRENT_DATE
 ORDER BY settlement_date DESC NULLS LAST, contract_date DESC NULLS LAST
 LIMIT 50;

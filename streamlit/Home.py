@@ -37,8 +37,7 @@ def get_recent_sales():
             percent_interest_of_sale    AS "% Interest Sold",
             area               AS "Area",
             primary_purpose    AS "Primary Purpose",
-            zone_code          AS "Zone",
-            nature_of_property AS "Nature of Property"
+            zone_code          AS "Zone"
         FROM mv_recent_sales
     """
     conn = get_connection()
