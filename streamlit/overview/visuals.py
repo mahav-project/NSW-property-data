@@ -96,7 +96,7 @@ def render(years, postcodes, property_types):
                 )
                 st.plotly_chart(fig_price, use_container_width=True)
 
-            # Sales by Suburb
+            # Sales by Suburb — dual axis: grouped bars (volume) + lines (median price)
             st.subheader("Top 10 Suburbs")
 
             columns, rows = f_suburb
@@ -107,41 +107,45 @@ def render(years, postcodes, property_types):
                 key=lambda s: sum(r["sales_count"] for r in suburb_data if r["suburb"] == s),
                 reverse=True,
             )
-            colors = {"House": "#636EFA", "Unit": "#EF553B"}
 
-            col_sub_vol, col_sub_price = st.columns(2)
+            from plotly.subplots import make_subplots
+            fig_suburb = make_subplots(specs=[[{"secondary_y": True}]])
 
-            with col_sub_vol:
-                st.subheader("Sales by Suburb")
-                fig_sub_vol = go.Figure()
-                for ptype in ["House", "Unit"]:
-                    subset = {r["suburb"]: r for r in suburb_data if r["property_type"] == ptype}
-                    fig_sub_vol.add_trace(go.Bar(
+            for ptype, color in [("House", "#50C878"), ("Unit", "#66CDAA")]:
+                subset = {r["suburb"]: r for r in suburb_data if r["property_type"] == ptype}
+                fig_suburb.add_trace(
+                    go.Bar(
                         x=suburbs,
                         y=[subset[s]["sales_count"] if s in subset else 0 for s in suburbs],
-                        name=ptype,
-                        marker_color=colors[ptype],
-                    ))
-                fig_sub_vol.update_layout(barmode="group", yaxis={"title": "Sales"}, height=400)
-                st.plotly_chart(fig_sub_vol, use_container_width=True)
+                        name=f"{ptype} sales",
+                        marker_color=color,
+                    ),
+                    secondary_y=False,
+                )
 
-            with col_sub_price:
-                st.subheader("Median Price by Suburb")
-                fig_sub_price = go.Figure()
-                for ptype in ["House", "Unit"]:
-                    subset = {r["suburb"]: r for r in suburb_data if r["property_type"] == ptype}
-                    fig_sub_price.add_trace(go.Bar(
+            for ptype, dash, color in [("House", "solid", "#FF6347"), ("Unit", "dot", "#FF6347")]:
+                subset = {r["suburb"]: r for r in suburb_data if r["property_type"] == ptype}
+                fig_suburb.add_trace(
+                    go.Scatter(
                         x=suburbs,
                         y=[subset[s]["median_price"] if s in subset else 0 for s in suburbs],
-                        name=ptype,
-                        marker_color=colors[ptype],
-                    ))
-                fig_sub_price.update_layout(
-                    barmode="group",
-                    yaxis={"title": "Median Price ($)", "tickprefix": "$", "tickformat": ",.0f"},
-                    height=400,
+                        name=f"{ptype} price",
+                        mode="lines+markers",
+                        line={"dash": dash, "color": color, "width": 2.5},
+                        marker={"size": 8},
+                    ),
+                    secondary_y=True,
                 )
-                st.plotly_chart(fig_sub_price, use_container_width=True)
+
+            fig_suburb.update_layout(
+                barmode="group",
+                height=450,
+                legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "center", "x": 0.5},
+            )
+            fig_suburb.update_yaxes(title_text="Sales Volume", secondary_y=False)
+            fig_suburb.update_yaxes(title_text="Median Price ($M)", tickprefix="$", tickformat=",.0f", secondary_y=True)
+
+            st.plotly_chart(fig_suburb, use_container_width=True)
 
     except Exception as error:
         st.error("Database error: " + str(error))
