@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 
 from overview.queries import get_sales_stats, get_suburb_stats, get_price_trends
+from plotly.subplots import make_subplots
 
 
 def _load_data(years, postcodes, property_types):
@@ -96,7 +97,7 @@ def render(years, postcodes, property_types):
                 )
                 st.plotly_chart(fig_price, use_container_width=True)
 
-            # Sales by Suburb — dual axis: grouped bars (volume) + lines (median price)
+            # Sales by Suburb
             st.subheader("Top 10 Suburbs")
 
             columns, rows = f_suburb
@@ -107,11 +108,9 @@ def render(years, postcodes, property_types):
                 key=lambda s: sum(r["sales_count"] for r in suburb_data if r["suburb"] == s),
                 reverse=True,
             )
-
-            from plotly.subplots import make_subplots
             fig_suburb = make_subplots(specs=[[{"secondary_y": True}]])
 
-            for ptype, color in [("House", "#50C878"), ("Unit", "#66CDAA")]:
+            for ptype, color in [("House", "#636EFA"), ("Unit", "#FF7F50")]:
                 subset = {r["suburb"]: r for r in suburb_data if r["property_type"] == ptype}
                 fig_suburb.add_trace(
                     go.Bar(
@@ -123,27 +122,67 @@ def render(years, postcodes, property_types):
                     secondary_y=False,
                 )
 
-            for ptype, dash, color in [("House", "solid", "#FF6347"), ("Unit", "dot", "#FF6347")]:
+            PRICE_CAP = 3_000_000
+
+            for ptype, dash, color in [("House", "solid", "#1B3A6B"), ("Unit", "dash", "#E8590C")]:
                 subset = {r["suburb"]: r for r in suburb_data if r["property_type"] == ptype}
+                real_prices = [float(subset[s]["median_price"]) if s in subset else 0 for s in suburbs]
+                capped_prices = [min(p, PRICE_CAP) for p in real_prices]
+                capped_mask = [p > PRICE_CAP for p in real_prices]
+
+                # Main line with regular markers
                 fig_suburb.add_trace(
                     go.Scatter(
                         x=suburbs,
-                        y=[subset[s]["median_price"] if s in subset else 0 for s in suburbs],
+                        y=capped_prices,
                         name=f"{ptype} price",
                         mode="lines+markers",
                         line={"dash": dash, "color": color, "width": 2.5},
                         marker={"size": 8},
+                        customdata=real_prices,
+                        hovertemplate="%{x}<br>Median: $%{customdata:,.0f}<extra></extra>",
                     ),
                     secondary_y=True,
                 )
+
+                # Overlay amber triangles on capped points
+                if any(capped_mask):
+                    fig_suburb.add_trace(
+                        go.Scatter(
+                            x=[s for s, m in zip(suburbs, capped_mask) if m],
+                            y=[PRICE_CAP for m in capped_mask if m],
+                            mode="markers",
+                            marker={"symbol": "triangle-up", "size": 14, "color": "#FFB020",
+                                    "line": {"width": 1.5, "color": "#CC8800"}},
+                            customdata=[p for p, m in zip(real_prices, capped_mask) if m],
+                            hovertemplate="%{x}<br>Median: $%{customdata:,.0f} (capped at $3M)<extra></extra>",
+                            showlegend=False,
+                        ),
+                        secondary_y=True,
+                    )
 
             fig_suburb.update_layout(
                 barmode="group",
                 height=450,
                 legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "center", "x": 0.5},
             )
-            fig_suburb.update_yaxes(title_text="Sales Volume", secondary_y=False)
-            fig_suburb.update_yaxes(title_text="Median Price ($M)", tickprefix="$", tickformat=",.0f", secondary_y=True)
+            fig_suburb.update_yaxes(title_text="Sales Volume", ticksuffix="k", tickformat=".0f",
+                                    dtick=10000, secondary_y=False)
+            price_ticks = list(range(0, PRICE_CAP + 1, 200_000))
+            price_labels = []
+            for v in price_ticks:
+                if v == 0:
+                    price_labels.append("$0")
+                elif v < 1_000_000:
+                    price_labels.append(f"${v // 1000}k")
+                elif v % 1_000_000 == 0:
+                    price_labels.append(f"${v // 1_000_000}M")
+                else:
+                    price_labels.append(f"${v / 1_000_000:.1f}M")
+            fig_suburb.update_yaxes(title_text="Median Price ($M)",
+                                    range=[0, PRICE_CAP * 1.05],
+                                    tickvals=price_ticks, ticktext=price_labels,
+                                    secondary_y=True)
 
             st.plotly_chart(fig_suburb, use_container_width=True)
 
